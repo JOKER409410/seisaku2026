@@ -1,4 +1,4 @@
-import { shell, net } from 'electron'
+import { shell } from 'electron'
 import * as keytar from 'keytar'
 import * as http from 'http'
 import * as dotenv from 'dotenv'
@@ -27,7 +27,6 @@ export async function deleteToken(): Promise<void> {
 // OAuth認証フローを開始
 export async function startOAuthFlow(): Promise<string> {
   return new Promise((resolve, reject) => {
-    // localhostでcodeを待ち受け
     const server = http.createServer(async (req, res) => {
       if (!req.url?.startsWith('/callback')) return
 
@@ -35,6 +34,7 @@ export async function startOAuthFlow(): Promise<string> {
       const code = url.searchParams.get('code')
 
       if (!code) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
         res.end('認証失敗。コードが取得できませんでした。')
         reject(new Error('code not found'))
         return
@@ -53,6 +53,7 @@ export async function startOAuthFlow(): Promise<string> {
       const tokenData = await tokenRes.json()
 
       if (tokenData.error) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
         res.end('認証失敗: ' + tokenData.error_description)
         reject(new Error(tokenData.error_description))
         return
@@ -76,13 +77,13 @@ export async function startOAuthFlow(): Promise<string> {
         })
       )
 
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       res.end(`認証成功！ようこそ ${user.login} さん。このタブは閉じてください。`)
       server.close()
       resolve(tokenData.access_token)
     })
 
     server.listen(8080, () => {
-      // ブラウザでGitHub認証ページを開く
       const authUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&scope=${SCOPE}&redirect_uri=${REDIRECT_URI}`
       shell.openExternal(authUrl)
     })
