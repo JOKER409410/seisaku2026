@@ -1,0 +1,111 @@
+import { writeFileSync } from 'fs'
+import { join } from 'path'
+import { app } from 'electron'
+
+const OUTPUT_PATH = join(app.getPath('userData'), 'github-data.json')
+
+// リポジトリ一覧を取得
+export async function getRepositories(token: string): Promise<{ name: string; full_name: string }[]> {
+  const repos: { name: string; full_name: string }[] = []
+  let page = 1
+
+  while (true) {
+    const res = await fetch(`https://api.github.com/user/repos?per_page=100&page=${page}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const data = await res.json()
+    if (!Array.isArray(data) || data.length === 0) break
+    repos.push(...data.map((r: any) => ({ name: r.name, full_name: r.full_name })))
+    page++
+  }
+
+  return repos
+}
+
+// コミット数をユーザーごとに集計
+async function getCommitStats(
+  token: string,
+  fullName: string
+): Promise<{ total: number; byUser: Record<string, number> }> {
+  const byUser: Record<string, number> = {}
+  let page = 1
+
+  while (true) {
+    const res = await fetch(
+      `https://api.github.com/repos/${fullName}/commits?per_page=100&page=${page}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    const data = await res.json()
+    if (!Array.isArray(data) || data.length === 0) break
+
+    for (const commit of data) {
+      const author = commit.author?.login || commit.commit?.author?.name || 'unknown'
+      byUser[author] = (byUser[author] || 0) + 1
+    }
+    page++
+  }
+
+  const total = Object.values(byUser).reduce((a, b) => a + b, 0)
+  return { total, byUser }
+}
+
+// ブランチ作成回数をユーザーごとに集計
+async function getBranchStats(
+  token: string,
+  fullName: string
+): Promise<{ total: number; byUser: Record<string, number> }> {
+  const byUser: Record<string, number> = {}
+  let page = 1
+
+  while (true) {
+    const res = await fetch(
+      `https://api.github.com/repos/${fullName}/branches?per_page=100&page=${page}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    const data = await res.json()
+    if (!Array.isArray(data) || data.length === 0) break
+
+    for (const branch of data) {
+      // ブランチの最初のコミットの作者を取得
+      const commitRes = await fetch(
+        `https://api.github.com/repos/${fullName}/commits/${branch.commit.sha}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      const commitData = await commitRes.json()
+      const author = commitData.author?.login || commitData.commit?.author?.name || 'unknown'
+      byUser[author] = (byUser[author] || 0) + 1
+    }
+    page++
+  }
+
+  const total = Object.values(byUser).reduce((a, b) => a + b, 0)
+  return { total, byUser }
+}
+
+// 選択されたリポジトリのデータを取得してJSONに保存
+export async function fetchAndSaveData(token: string, selectedRepos: string[]): Promise<void> {
+  const result: Record<string, any> = {}
+
+  for (const fullName of selectedRepos) {
+    console.log(`取得中: ${fullName}`)
+
+    const [commits, branches] = await Promise.all([
+      getCommitStats(token, fullName),
+      getBranchStats(token, fullName)
+    ])
+
+    result[fullName] = {
+      commits,
+      branches,
+      fetched_at: new Date().toISOString()
+    }
+  }
+
+  writeFileSync(OUTPUT_PATH, JSON.stringify(result, null, 2), 'utf-8')
+  console.log('保存完了:', OUTPUT_PATH)
+}
+
+// 保存先のパスを返す
+export function getOutputPath(): string {
+  return OUTPUT_PATH
+}
