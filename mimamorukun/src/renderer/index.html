@@ -2,49 +2,60 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Electron</title>
+    <title>mimamorukun</title>
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     />
     <link href="./assets/main.css" type="text/css" rel="stylesheet" />
+    <style>
+      .page { display: none; }
+      .page h2 { margin-bottom: 16px; }
+      button { margin: 4px; padding: 8px 16px; cursor: pointer; }
+      ul { list-style: none; padding: 0; }
+      li { margin: 8px 0; }
+      select { padding: 6px; margin: 4px; }
+      p { margin: 8px 0; }
+    </style>
   </head>
 
   <body>
     <div id="app">
-      <img alt="logo" class="logo" src="./assets/electron.svg" />
-      <div class="creator">Powered by electron-vite</div>
-      <div class="text">
-        Build an Electron app with
-        <span class="ts">TypeScript</span>
-      </div>
-      <p class="tip">Please try pressing <code>F12</code> to open the devTool</p>
 
-      <!-- 認証UI -->
-      <div class="actions">
-        <div class="action">
-          <button id="loginBtn">GitHubでログイン</button>
-        </div>
-        <div class="action">
-          <button id="logoutBtn">ログアウト</button>
-        </div>
-      </div>
-      <p id="authStatus">未認証</p>
-
-      <div class="actions">
-        <div class="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">Documentation</a>
-        </div>
-        <div class="action">
-          <a id="ipcHandler" target="_blank" rel="noreferrer">Send IPC</a>
-        </div>
+      <!-- 画面1: 認証 -->
+      <div id="page1" class="page">
+        <h2>GitHubにログイン</h2>
+        <button id="loginBtn">GitHubでログイン</button>
+        <p id="authStatus"></p>
+        <p id="userCode"></p>
       </div>
 
-      <ul class="versions">
-        <li class="electron-version"></li>
-        <li class="chrome-version"></li>
-        <li class="node-version"></li>
-      </ul>
+      <!-- 画面2: リポジトリ管理 -->
+      <div id="page2" class="page">
+        <h2>リポジトリ管理</h2>
+        <h3>登録済みリポジトリ（最大5個）</h3>
+        <ul id="registeredList"></ul>
+        <select id="repoSelect">
+          <option value="">リポジトリを選択...</option>
+        </select>
+        <button id="addRepoBtn">追加</button>
+        <p id="repoMessage"></p>
+        <hr />
+        <button id="toPage3Btn">次へ →</button>
+        <button id="logoutBtn">ログアウト</button>
+      </div>
+
+      <!-- 画面3: データ取得 -->
+      <div id="page3" class="page">
+        <h2>データ取得</h2>
+        <h3>取得するリポジトリを選択</h3>
+        <ul id="checkList"></ul>
+        <button id="fetchBtn">データを取得して保存</button>
+        <p id="fetchStatus"></p>
+        <hr />
+        <button id="toPage2Btn">← 前へ</button>
+      </div>
+
     </div>
 
     <script type="module" src="./src/renderer.ts"></script>
