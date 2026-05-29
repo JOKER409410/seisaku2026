@@ -2,7 +2,9 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { startOAuthFlow, getSavedToken, deleteToken } from './auth'
+import { startOAuthFlow, getSavedToken, deleteToken, pollForToken } from './auth'
+import { getRepositories, fetchAndSaveData, getOutputPath } from './github'
+import { loadRepos, addRepo, removeRepo } from './repos'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -40,19 +42,60 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // 保存済みトークンを取得してrendererに返す
+  // ─── 認証系 ───────────────────────────────────────
+
+  // 保存済みトークンを取得
   ipcMain.handle('auth:getToken', async () => {
     return await getSavedToken()
   })
 
-  // OAuth認証フローを開始してrendererに返す
+  // デバイスフロー開始（ユーザーコードを返す）
   ipcMain.handle('auth:login', async () => {
-    return await startOAuthFlow()
+  return await startOAuthFlow()
+})
+
+  // ユーザーが認証するまでポーリング
+  ipcMain.handle('auth:poll', async () => {
+    return await pollForToken()
   })
 
-  // トークンを削除（ログアウト）
+  // ログアウト
   ipcMain.handle('auth:logout', async () => {
     await deleteToken()
+  })
+
+  // ─── リポジトリ管理系 ──────────────────────────────
+
+  // GitHubからリポジトリ一覧を取得
+  ipcMain.handle('repos:getAll', async () => {
+    const token = await getSavedToken()
+    if (!token) throw new Error('未認証です')
+    return await getRepositories(token)
+  })
+
+  // 登録済みリポジトリを取得
+  ipcMain.handle('repos:load', () => {
+    return loadRepos()
+  })
+
+  // リポジトリを追加
+  ipcMain.handle('repos:add', (_, repo: { name: string; full_name: string }) => {
+    return addRepo(repo)
+  })
+
+  // リポジトリを削除
+  ipcMain.handle('repos:remove', (_, fullName: string) => {
+    removeRepo(fullName)
+  })
+
+  // ─── データ取得系 ──────────────────────────────────
+
+  // 選択したリポジトリのデータを取得してJSONに保存
+  ipcMain.handle('github:fetch', async (_, selectedRepos: string[]) => {
+    const token = await getSavedToken()
+    if (!token) throw new Error('未認証です')
+    await fetchAndSaveData(token, selectedRepos)
+    return getOutputPath()
   })
 
   createWindow()
