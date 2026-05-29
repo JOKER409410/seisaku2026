@@ -8,6 +8,10 @@ const SCOPE = 'read:org,repo'
 const SERVICE_NAME = 'mimamorukun'
 const ACCOUNT_NAME = 'github_token'
 
+// device_codeを一時保存
+let _deviceCode = ''
+let _interval = 5
+
 // 保存済みトークンを取得
 export async function getSavedToken(): Promise<string | null> {
   const saved = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME)
@@ -33,6 +37,15 @@ export async function startOAuthFlow(): Promise<{ userCode: string; verification
   })
 
   const data = await res.json()
+  console.log('デバイスフロー開始:', data)
+
+  // device_codeとintervalを保存
+  _deviceCode = data.device_code
+  _interval = data.interval || 5
+
+  // ブラウザでGitHubの入力ページを開く
+  shell.openExternal(data.verification_uri)
+
   return {
     userCode: data.user_code,
     verificationUri: data.verification_uri
@@ -40,9 +53,9 @@ export async function startOAuthFlow(): Promise<{ userCode: string; verification
 }
 
 // ユーザーが認証するまでポーリング
-export async function pollForToken(interval = 5): Promise<string> {
+export async function pollForToken(): Promise<string> {
   while (true) {
-    await new Promise((resolve) => setTimeout(resolve, interval * 1000))
+    await new Promise((resolve) => setTimeout(resolve, _interval * 1000))
 
     const res = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
@@ -52,12 +65,13 @@ export async function pollForToken(interval = 5): Promise<string> {
       },
       body: JSON.stringify({
         client_id: CLIENT_ID,
-        device_code: await getDeviceCode(),
+        device_code: _deviceCode,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
       })
     })
 
     const data = await res.json()
+    console.log('ポーリング結果:', data)
 
     if (data.access_token) {
       // ユーザー情報を取得
@@ -78,26 +92,12 @@ export async function pollForToken(interval = 5): Promise<string> {
         })
       )
 
+      console.log('認証成功:', user.login)
       return data.access_token
     }
 
-    // authorization_pending は待機継続、それ以外はエラー
     if (data.error && data.error !== 'authorization_pending') {
       throw new Error(data.error)
     }
   }
-}
-
-// device_codeを一時保存
-let _deviceCode = ''
-export function setDeviceCode(code: string): void {
-  _deviceCode = code
-}
-async function getDeviceCode(): Promise<string> {
-  return _deviceCode
-}
-
-// ブラウザでGitHubの入力ページを開く
-export function openVerificationPage(uri: string): void {
-  shell.openExternal(uri)
 }
