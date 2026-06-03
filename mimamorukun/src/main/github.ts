@@ -109,3 +109,33 @@ export async function fetchAndSaveData(token: string, selectedRepos: string[]): 
 export function getOutputPath(): string {
   return OUTPUT_PATH
 }
+
+// 崩壊度を計算
+export function calculateDistortion(
+  commits: Record<string, number>,
+  branches: Record<string, number>
+): { scores: Record<string, number>; avgScore: number; stdDev: number; distortion: number } {
+  // 各ユーザーのスコアを計算
+  const scores: Record<string, number> = {}
+  const users = new Set([...Object.keys(commits), ...Object.keys(branches)])
+
+  for (const user of users) {
+    const commitCount = commits[user] || 0
+    const branchCount = branches[user] || 0
+    scores[user] = Math.log(commitCount + 1) * 0.7 + Math.log(branchCount + 1) * 0.3
+  }
+
+  // 平均スコア
+  const scoreValues = Object.values(scores)
+  const avgScore = scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length
+
+  // 標準偏差
+  const variance =
+    scoreValues.reduce((sum, score) => sum + Math.pow(score - avgScore, 2), 0) / scoreValues.length
+  const stdDev = Math.sqrt(variance)
+
+  // 崩壊度
+  const distortion = (stdDev / avgScore) * 100
+
+  return { scores, avgScore, stdDev, distortion }
+}

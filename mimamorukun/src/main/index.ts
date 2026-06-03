@@ -1,9 +1,10 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { readFileSync } from 'fs'
 import icon from '../../resources/icon.png?asset'
 import { startOAuthFlow, getSavedToken, deleteToken, pollForToken } from './auth'
-import { getRepositories, fetchAndSaveData, getOutputPath } from './github'
+import { getRepositories, fetchAndSaveData, getOutputPath, calculateDistortion } from './github'
 import { loadRepos, addRepo, removeRepo } from './repos'
 
 function createWindow(): void {
@@ -96,6 +97,21 @@ app.whenReady().then(() => {
     if (!token) throw new Error('未認証です')
     await fetchAndSaveData(token, selectedRepos)
     return getOutputPath()
+  })
+
+  // リポジトリのデータから崩壊度を計算
+  ipcMain.handle('github:calculateDistortion', async (_, repoName: string) => {
+    const outputPath = getOutputPath()
+    const data = JSON.parse(readFileSync(outputPath, 'utf-8'))
+
+    if (!data[repoName]) {
+      throw new Error(`データが見つかりません: ${repoName}`)
+    }
+
+    const repoData = data[repoName]
+    const result = calculateDistortion(repoData.commits.byUser, repoData.branches.byUser)
+
+    return result
   })
 
   createWindow()

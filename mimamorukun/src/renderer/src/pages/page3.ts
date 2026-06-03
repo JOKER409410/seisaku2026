@@ -1,4 +1,5 @@
 import { showPage } from '../utils/dom'
+import { renderDistortionMeter } from './page4'
 
 // 画面3のラジオボタンを更新
 export async function renderCheckList(): Promise<void> {
@@ -51,5 +52,9 @@ export function setupPage3(): void {
     if (fetchStatus) fetchStatus.innerText = '取得中...'
     const outputPath = await window.api.fetchData([selected.value])
     if (fetchStatus) fetchStatus.innerText = `保存完了: ${outputPath}`
+
+    // データ取得後にページ4に遷移して崩壊度メーターを表示
+    await renderDistortionMeter(selected.value)
+    showPage('page4')
   })
 }

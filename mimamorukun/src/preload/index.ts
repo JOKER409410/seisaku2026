@@ -42,7 +42,11 @@ const api = {
 
   // 選択したリポジトリのデータを取得してJSONに保存
   fetchData: (selectedRepos: string[]): Promise<string> =>
-    ipcRenderer.invoke('github:fetch', selectedRepos)
+    ipcRenderer.invoke('github:fetch', selectedRepos),
+
+  // 崩壊度を計算
+  calculateDistortion: (repoName: string): Promise<{ scores: Record<string, number>; avgScore: number; stdDev: number; distortion: number }> =>
+    ipcRenderer.invoke('github:calculateDistortion', repoName)
 }
 
 if (process.contextIsolated) {
