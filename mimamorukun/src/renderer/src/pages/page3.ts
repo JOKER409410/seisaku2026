@@ -1,6 +1,6 @@
 import { showPage } from '../utils/dom'
 
-// 画面3のチェックボックスを更新
+// 画面3のラジオボタンを更新
 export async function renderCheckList(): Promise<void> {
   const checkList = document.getElementById('checkList')
   if (!checkList) return
@@ -17,12 +17,16 @@ export async function renderCheckList(): Promise<void> {
     const li = document.createElement('li')
     li.innerHTML = `
       <label>
-        <input type="checkbox" class="repoCheckbox" value="${repo.full_name}" checked />
+        <input type="radio" name="repoRadio" class="repoRadio" value="${repo.full_name}" />
         ${repo.full_name}
       </label>
     `
     checkList.appendChild(li)
   }
+
+  // 最初の項目をデフォルト選択
+  const first = checkList.querySelector<HTMLInputElement>('.repoRadio')
+  if (first) first.checked = true
 }
 
 export function setupPage3(): void {
@@ -37,16 +41,15 @@ export function setupPage3(): void {
   // データ取得ボタン
   fetchBtn?.addEventListener('click', async () => {
     const fetchStatus = document.getElementById('fetchStatus')
-    const checkboxes = document.querySelectorAll<HTMLInputElement>('.repoCheckbox:checked')
-    const selected = Array.from(checkboxes).map((cb) => cb.value)
+    const selected = document.querySelector<HTMLInputElement>('.repoRadio:checked')
 
-    if (selected.length === 0) {
+    if (!selected) {
       if (fetchStatus) fetchStatus.innerText = 'リポジトリを選択してください'
       return
     }
 
     if (fetchStatus) fetchStatus.innerText = '取得中...'
-    const outputPath = await window.api.fetchData(selected)
+    const outputPath = await window.api.fetchData([selected.value])
     if (fetchStatus) fetchStatus.innerText = `保存完了: ${outputPath}`
   })
 }
