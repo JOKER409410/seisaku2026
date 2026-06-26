@@ -53,6 +53,13 @@ GITHUB_CLIENT_SECRET=ここにClient Secretを貼る
 
 ---
 
+
+### STEP 3.5 階層変更
+
+---bash
+cd mimamorukun
+---
+
 ### STEP 4　依存ライブラリをインストール
 
 ```bash
