@@ -1,5 +1,6 @@
 import { showPage } from '../utils/dom'
 import { renderDistortionMeter } from './pageresult'
+import { initDiscordFlow } from './pagedis1'
 
 // グローバル変数でリポジトリ名を保持
 export let selectedRepoName: string = ''
@@ -59,7 +60,7 @@ export function setupPage3(): void {
     // リポジトリ名を保存
     selectedRepoName = selected.value
 
-    // データ取得後にページ4（中間ページ）に遷移
-    showPage('pagedis1')
+    // Discordフロー開始（登録済みならスキップ判定も含む）
+    await initDiscordFlow()
   })
 }

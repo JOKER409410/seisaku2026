@@ -6,6 +6,18 @@ import icon from '../../resources/icon.png?asset'
 import { startOAuthFlow, getSavedToken, deleteToken, pollForToken } from './auth'
 import { getRepositories, fetchAndSaveData, getOutputPath, calculateDistortion } from './github'
 import { loadRepos, addRepo, removeRepo } from './repos'
+import {
+  initDiscordTables,
+  getAvailableServers,
+  getDiscordSettings,
+  saveDiscordServer,
+  setBotRegistered,
+  getDiscordUsers,
+  getAccountLinks,
+  saveAccountLink,
+  saveGithubUsersToDB,
+  calcDiscordScores
+} from './discord'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -36,82 +48,115 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // ─── 認証系 ───────────────────────────────────────
+  // Discord用テーブルをアプリ起動時に初期化
+  try {
+    await initDiscordTables()
+  } catch (e) {
+    console.error('[discord] テーブル初期化失敗:', e)
+  }
 
-  // 保存済みトークンを取得
+  // ─── 認証系 ───────────────────────────────────────
   ipcMain.handle('auth:getToken', async () => {
     return await getSavedToken()
   })
-
-  // デバイスフロー開始（ユーザーコードを返す）
   ipcMain.handle('auth:login', async () => {
-  return await startOAuthFlow()
-})
-
-  // ユーザーが認証するまでポーリング
+    return await startOAuthFlow()
+  })
   ipcMain.handle('auth:poll', async () => {
     return await pollForToken()
   })
-
-  // ログアウト
   ipcMain.handle('auth:logout', async () => {
     await deleteToken()
   })
 
   // ─── リポジトリ管理系 ──────────────────────────────
-
-  // GitHubからリポジトリ一覧を取得
   ipcMain.handle('repos:getAll', async () => {
     const token = await getSavedToken()
     if (!token) throw new Error('未認証です')
     return await getRepositories(token)
   })
-
-  // 登録済みリポジトリを取得
   ipcMain.handle('repos:load', () => {
     return loadRepos()
   })
-
-  // リポジトリを追加
   ipcMain.handle('repos:add', (_, repo: { name: string; full_name: string }) => {
     return addRepo(repo)
   })
-
-  // リポジトリを削除
   ipcMain.handle('repos:remove', (_, fullName: string) => {
     removeRepo(fullName)
   })
 
   // ─── データ取得系 ──────────────────────────────────
-
-  // 選択したリポジトリのデータを取得してJSONに保存
   ipcMain.handle('github:fetch', async (_, selectedRepos: string[]) => {
     const token = await getSavedToken()
     if (!token) throw new Error('未認証です')
     await fetchAndSaveData(token, selectedRepos)
     return getOutputPath()
   })
-
-  // リポジトリのデータから崩壊度を計算
   ipcMain.handle('github:calculateDistortion', async (_, repoName: string) => {
     const outputPath = getOutputPath()
     const data = JSON.parse(readFileSync(outputPath, 'utf-8'))
-
-    if (!data[repoName]) {
-      throw new Error(`データが見つかりません: ${repoName}`)
-    }
-
+    if (!data[repoName]) throw new Error(`データが見つかりません: ${repoName}`)
     const repoData = data[repoName]
-    const result = calculateDistortion(repoData.commits.byUser, repoData.branches.byUser)
+    return calculateDistortion(repoData.commits.byUser, repoData.branches.byUser)
+  })
 
-    return result
+  // ─── Discord系 ────────────────────────────────────
+  // Botが収集済みのサーバー一覧（messagesテーブル、読み取りのみ）
+  ipcMain.handle('discord:getAvailableServers', async () => {
+    return await getAvailableServers()
+  })
+
+  // 登録済みDiscord設定を取得
+  ipcMain.handle('discord:getSettings', async () => {
+    return await getDiscordSettings()
+  })
+
+  // サーバーを登録
+  ipcMain.handle('discord:saveServer', async (_, guildId: string, guildName: string) => {
+    await saveDiscordServer(guildId, guildName)
+  })
+
+  // Bot登録フラグをtrueに更新
+  ipcMain.handle('discord:setBotRegistered', async (_, guildId: string) => {
+    await setBotRegistered(guildId)
+  })
+
+  // 指定サーバーのDiscordユーザー一覧
+  ipcMain.handle('discord:getDiscordUsers', async (_, guildId: string) => {
+    return await getDiscordUsers(guildId)
+  })
+
+  // アカウント紐付けを取得
+  ipcMain.handle('discord:getAccountLinks', async (_, repoFullName: string) => {
+    return await getAccountLinks(repoFullName)
+  })
+
+  // アカウント紐付けを保存
+  ipcMain.handle(
+    'discord:saveAccountLink',
+    async (_, githubUsername: string, discordUserId: string, discordUserName: string, repoFullName: string) => {
+      await saveAccountLink(githubUsername, discordUserId, discordUserName, repoFullName)
+    }
+  )
+
+  // github-data.jsonのGitHubユーザー名をDBに保存
+  ipcMain.handle(
+    'discord:saveGithubUsers',
+    async (_, repoFullName: string, githubUsernames: string[]) => {
+      await saveGithubUsersToDB(repoFullName, githubUsernames)
+    }
+  )
+
+  // Discordスコアを計算
+  ipcMain.handle('discord:calcScores', async (_, guildId: string) => {
+    return await calcDiscordScores(guildId)
   })
 
   createWindow()
