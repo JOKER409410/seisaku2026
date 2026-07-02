@@ -18,6 +18,13 @@ import {
   saveGithubUsersToDB,
   calcDiscordScores
 } from './discord'
+import {
+  startDiscordOAuth,
+  getSavedDiscordToken,
+  getSavedDiscordUser,
+  deleteDiscordToken,
+  getMyGuilds
+} from './discordAuth'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -62,19 +69,11 @@ app.whenReady().then(async () => {
     console.error('[discord] テーブル初期化失敗:', e)
   }
 
-  // ─── 認証系 ───────────────────────────────────────
-  ipcMain.handle('auth:getToken', async () => {
-    return await getSavedToken()
-  })
-  ipcMain.handle('auth:login', async () => {
-    return await startOAuthFlow()
-  })
-  ipcMain.handle('auth:poll', async () => {
-    return await pollForToken()
-  })
-  ipcMain.handle('auth:logout', async () => {
-    await deleteToken()
-  })
+  // ─── GitHub認証系 ──────────────────────────────────
+  ipcMain.handle('auth:getToken', async () => await getSavedToken())
+  ipcMain.handle('auth:login', async () => await startOAuthFlow())
+  ipcMain.handle('auth:poll', async () => await pollForToken())
+  ipcMain.handle('auth:logout', async () => await deleteToken())
 
   // ─── リポジトリ管理系 ──────────────────────────────
   ipcMain.handle('repos:getAll', async () => {
@@ -82,15 +81,9 @@ app.whenReady().then(async () => {
     if (!token) throw new Error('未認証です')
     return await getRepositories(token)
   })
-  ipcMain.handle('repos:load', () => {
-    return loadRepos()
-  })
-  ipcMain.handle('repos:add', (_, repo: { name: string; full_name: string }) => {
-    return addRepo(repo)
-  })
-  ipcMain.handle('repos:remove', (_, fullName: string) => {
-    removeRepo(fullName)
-  })
+  ipcMain.handle('repos:load', () => loadRepos())
+  ipcMain.handle('repos:add', (_, repo: { name: string; full_name: string }) => addRepo(repo))
+  ipcMain.handle('repos:remove', (_, fullName: string) => removeRepo(fullName))
 
   // ─── データ取得系 ──────────────────────────────────
   ipcMain.handle('github:fetch', async (_, selectedRepos: string[]) => {
@@ -107,54 +100,49 @@ app.whenReady().then(async () => {
     return calculateDistortion(repoData.commits.byUser, repoData.branches.byUser)
   })
 
-  // ─── Discord系 ────────────────────────────────────
-  // Botが収集済みのサーバー一覧（messagesテーブル、読み取りのみ）
-  ipcMain.handle('discord:getAvailableServers', async () => {
-    return await getAvailableServers()
+  // ─── Discord OAuth認証系 ───────────────────────────
+  // 保存済みDiscordトークン確認（ユーザー情報のみ返す。トークン自体はrendererに渡さない）
+  ipcMain.handle('discord:getUser', async () => await getSavedDiscordUser())
+
+  // OAuth2フロー開始（ブラウザを開いてコールバックを待つ）
+  ipcMain.handle('discord:login', async () => await startDiscordOAuth())
+
+  // Discordログアウト
+  ipcMain.handle('discord:logout', async () => await deleteDiscordToken())
+
+  // ログインユーザーが参加しているサーバー一覧を取得
+  // → messagesテーブルのサーバーと照合して「Botが入っていてかつ自分が参加しているサーバー」だけ返す
+  ipcMain.handle('discord:getMyAvailableServers', async () => {
+    const myGuilds = await getMyGuilds()
+    const myGuildIds = new Set(myGuilds.map((g) => g.id))
+    const allServers = await getAvailableServers()
+    // Botが収集していて、かつ自分も参加しているサーバーに絞る
+    return allServers.filter((s) => myGuildIds.has(s.guild_id))
   })
 
-  // 登録済みDiscord設定を取得
-  ipcMain.handle('discord:getSettings', async () => {
-    return await getDiscordSettings()
-  })
-
-  // サーバーを登録
+  // ─── Discord DBアクセス系 ──────────────────────────
+  ipcMain.handle('discord:getSettings', async () => await getDiscordSettings())
   ipcMain.handle('discord:saveServer', async (_, guildId: string, guildName: string) => {
     await saveDiscordServer(guildId, guildName)
   })
-
-  // Bot登録フラグをtrueに更新
   ipcMain.handle('discord:setBotRegistered', async (_, guildId: string) => {
     await setBotRegistered(guildId)
   })
-
-  // 指定サーバーのDiscordユーザー一覧
   ipcMain.handle('discord:getDiscordUsers', async (_, guildId: string) => {
     return await getDiscordUsers(guildId)
   })
-
-  // アカウント紐付けを取得
   ipcMain.handle('discord:getAccountLinks', async (_, repoFullName: string) => {
     return await getAccountLinks(repoFullName)
   })
-
-  // アカウント紐付けを保存
   ipcMain.handle(
     'discord:saveAccountLink',
     async (_, githubUsername: string, discordUserId: string, discordUserName: string, repoFullName: string) => {
       await saveAccountLink(githubUsername, discordUserId, discordUserName, repoFullName)
     }
   )
-
-  // github-data.jsonのGitHubユーザー名をDBに保存
-  ipcMain.handle(
-    'discord:saveGithubUsers',
-    async (_, repoFullName: string, githubUsernames: string[]) => {
-      await saveGithubUsersToDB(repoFullName, githubUsernames)
-    }
-  )
-
-  // Discordスコアを計算
+  ipcMain.handle('discord:saveGithubUsers', async (_, repoFullName: string, githubUsernames: string[]) => {
+    await saveGithubUsersToDB(repoFullName, githubUsernames)
+  })
   ipcMain.handle('discord:calcScores', async (_, guildId: string) => {
     return await calcDiscordScores(guildId)
   })

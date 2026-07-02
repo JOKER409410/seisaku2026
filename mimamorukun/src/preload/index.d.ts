@@ -4,7 +4,7 @@ declare global {
   interface Window {
     electron: ElectronAPI
     api: {
-      // 認証系
+      // GitHub認証系
       getToken: () => Promise<string | null>
       login: () => Promise<{ userCode: string; verificationUri: string }>
       poll: () => Promise<string>
@@ -27,7 +27,10 @@ declare global {
 
       // Discord系
       discord: {
-        getAvailableServers: () => Promise<{ guild_id: string; guild_name: string; message_count: number }[]>
+        getUser: () => Promise<{ id: string; username: string } | null>
+        login: () => Promise<{ id: string; username: string }>
+        logout: () => Promise<void>
+        getMyAvailableServers: () => Promise<{ guild_id: string; guild_name: string; message_count: number }[]>
         getSettings: () => Promise<{ guild_id: string; guild_name: string; bot_registered: boolean } | null>
         saveServer: (guildId: string, guildName: string) => Promise<void>
         setBotRegistered: (guildId: string) => Promise<void>
