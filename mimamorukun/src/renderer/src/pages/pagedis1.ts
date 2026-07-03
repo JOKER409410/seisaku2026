@@ -175,7 +175,13 @@ export function setupPage4(): void {
     await goToLinkingPage()
   })
 
-  document.getElementById('dis2BackBtn')?.addEventListener('click', () => {
-    showPage('pagedis1')
+  // Bot確認ページの「ログアウト」→ Discordトークンを破棄してログイン画面に戻す
+  document.getElementById('dis2LogoutBtn')?.addEventListener('click', async () => {
+    await window.api.discord.logout()
+    selectedGuildId = ''
+    selectedGuildName = ''
+    const statusEl = document.getElementById('discordLoginStatus')
+    if (statusEl) statusEl.innerText = ''
+    showPage('discordLogin')
   })
 }
