@@ -26,18 +26,37 @@ async function proceedAfterLogin(): Promise<void> {
   // リポジトリ単位でDiscord設定を確認する（別リポジトリなら必ずサーバー選択に戻る）
   const settings = await window.api.discord.getSettings(selectedRepoName)
 
-  if (settings?.bot_registered) {
-    // 全て登録済み → アカウント紐付けページへ
-    selectedGuildId = settings.guild_id
-    selectedGuildName = settings.guild_name
-    await goToLinkingPage()
-    return
-  }
-
   if (settings?.guild_id) {
-    // サーバーは登録済みだがBotが未確認 → Bot確認ページへ
+    // ⚠️ 脆弱性修正: 過去に誰かが登録したサーバーだからといって、
+    // 「今ログインしているDiscordユーザーが実際にそのサーバーのメンバーか」は別問題。
+    // ここを確認せずに素通りさせると、サーバーに所属していない/退会した人でも
+    // 紐付け・スコアデータに到達できてしまうため、必ずメンバーシップを検証する。
+    const myServers = await window.api.discord.getMyAvailableServers()
+    const isMember = myServers.some((s) => s.guild_id === settings.guild_id)
+
+    if (!isMember) {
+      // メンバーでない → アクセス拒否。サーバー選択からやり直させる
+      await renderServerList()
+      showPage('pagedis1')
+      const msgEl = document.getElementById('serverMessage')
+      if (msgEl) {
+        msgEl.innerHTML =
+          `<span style="color:red;">「${settings.guild_name}」のメンバーではないため、` +
+          `このサーバーの情報にはアクセスできません。参加しているサーバーから選び直してください。</span>`
+      }
+      return
+    }
+
     selectedGuildId = settings.guild_id
     selectedGuildName = settings.guild_name
+
+    if (settings.bot_registered) {
+      // 全て登録済み → アカウント紐付けページへ
+      await goToLinkingPage()
+      return
+    }
+
+    // サーバーは登録済みだがBotが未確認 → Bot確認ページへ
     await renderBotConfirmPage()
     showPage('pagedis2')
     return
