@@ -131,12 +131,11 @@ export async function renderBotConfirmPage(): Promise<void> {
 // ─── アカウント紐付けページへ遷移 ───────────────────────────────────────
 export async function goToLinkingPage(): Promise<void> {
   try {
-    const existing = await window.api.discord.getAccountLinks(selectedRepoName)
-    if (existing.length === 0) {
-      const distortion = await window.api.calculateDistortion(selectedRepoName)
-      const githubUsernames = Object.keys(distortion.scores)
-      await window.api.discord.saveGithubUsers(selectedRepoName, githubUsernames)
-    }
+    // 最新のコントリビューター一覧を取得し、account_linksに無いユーザーだけ差分追加する
+    // （saveGithubUsers側はON CONFLICT DO NOTHINGなので、毎回呼んでも既存の紐付けは壊れない）
+    const distortion = await window.api.calculateDistortion(selectedRepoName)
+    const githubUsernames = Object.keys(distortion.scores)
+    await window.api.discord.saveGithubUsers(selectedRepoName, githubUsernames)
   } catch (e) {
     console.error('GitHubユーザー登録失敗:', e)
   }
