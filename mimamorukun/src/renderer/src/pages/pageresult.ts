@@ -89,6 +89,6 @@ export function setupPage5(): void {
 
   // 前へボタン
   backBtn?.addEventListener('click', () => {
-    showPage('pagedis1')
+    showPage('pagedis3')
   })
 }

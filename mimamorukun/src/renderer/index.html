@@ -42,13 +42,38 @@
         min-width: 50px;
         text-align: right;
       }
+      /* Discord系ページの共通スタイル */
+      .server-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        margin: 6px 0;
+        cursor: pointer;
+      }
+      .server-item:hover { background: #f3f4f6; }
+      .link-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        margin: 8px 0;
+      }
+      .link-row select { flex: 1; }
+      .github-label { font-weight: bold; min-width: 140px; }
+      .status-ok { color: #16a34a; font-weight: bold; }
+      .status-warn { color: #d97706; font-weight: bold; }
     </style>
   </head>
 
   <body>
     <div id="app">
 
-      <!-- 画面1: 認証 -->
+      <!-- 画面1: GitHubログイン -->
       <div id="pagegit1" class="page">
         <h2>GitHubにログイン</h2>
         <button id="loginBtn">GitHubでログイン</button>
@@ -84,18 +109,54 @@
         <button id="toPage2Btn">← 前へ</button>
       </div>
 
-      <!-- 画面4: 中間ページ -->
-      <div id="pagedis1" class="page">
-        <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 80vh; gap: 32px;">
-          <h1 style="font-size: 64px; font-weight: bold; text-align: center;">宮澤様最高！</h1>
-            <div style="display: flex; gap: 16px;">
-              <button id="toPage4BackBtn">← 前へ</button>
-              <button id="toPage5Btn">次へ →</button>
-          </div>
-        </div>
+      <!-- 画面4: Discordログイン -->
+      <div id="discordLogin" class="page">
+        <h2>Discordにログイン</h2>
+        <p>ブラウザが開くので、Discordアカウントで認証してください</p>
+        <p id="discordLoginStatus"></p>
+        <button id="discordLoginBtn">Discordでログイン</button>
+        <hr />
+        <button id="discordLoginBackBtn">← 前へ</button>
       </div>
 
-      <!-- 画面5: 崩壊度メーター -->
+      <!-- 画面5: Discordサーバー選択 -->
+      <div id="pagedis1" class="page">
+        <h2>Discordサーバーを選択</h2>
+        <p>Botがデータを収集しているサーバーから選んでください</p>
+        <ul id="serverList"></ul>
+        <p id="serverMessage"></p>
+        <button id="selectServerBtn" style="display:none;">このサーバーを使用</button>
+        <hr />
+        <p>サーバーが見つからない場合は、まずBotをそのサーバーに追加してください</p>
+        <button id="botInviteBtn">🤖 Botをサーバーに招待する</button>
+        <hr />
+        <button id="disBackBtn">← 前へ</button>
+      </div>
+
+      <!-- 画面5: Bot登録確認 -->
+      <div id="pagedis2" class="page">
+        <h2>Bot登録確認</h2>
+        <p>選択したサーバー: <strong id="botGuildName"></strong></p>
+        <p id="botStatus"></p>
+        <p id="botMessageCount"></p>
+        <button id="botRegisteredBtn">Bot登録完了・次へ →</button>
+        <hr />
+        <button id="dis2LogoutBtn">ログアウト</button>
+      </div>
+
+      <!-- 画面6: アカウント手動紐付け -->
+      <div id="pagedis3" class="page">
+        <h2>アカウント紐付け</h2>
+        <p>GitHubアカウントとDiscordアカウントを紐付けてください</p>
+        <p>（すでに紐付け済みのアカウントはスキップしてもOKです）</p>
+        <div id="linkingContainer"></div>
+        <p id="linkMessage"></p>
+        <button id="saveLinkBtn">紐付けを保存して次へ →</button>
+        <hr />
+        <button id="dis3BackBtn">← 前へ</button>
+      </div>
+
+      <!-- 画面7: 崩壊度メーター -->
       <div id="pageresult" class="page">
         <h2>崩壊度メーター</h2>
         <p id="meterLabel" style="font-size: 18px; font-weight: bold;"></p>

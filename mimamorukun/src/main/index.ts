@@ -6,6 +6,26 @@ import icon from '../../resources/icon.png?asset'
 import { startOAuthFlow, getSavedToken, deleteToken, pollForToken } from './auth'
 import { getRepositories, fetchAndSaveData, getOutputPath, calculateDistortion } from './github'
 import { loadRepos, addRepo, removeRepo } from './repos'
+import {
+  initDiscordTables,
+  getAvailableServers,
+  getDiscordSettings,
+  saveDiscordServer,
+  setBotRegistered,
+  getDiscordUsers,
+  getAccountLinks,
+  saveAccountLink,
+  saveGithubUsersToDB,
+  calcDiscordScores,
+  openBotInviteUrl
+} from './discord'
+import {
+  startDiscordOAuth,
+  getSavedDiscordToken,
+  getSavedDiscordUser,
+  deleteDiscordToken,
+  getMyGuilds
+} from './discordAuth'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -36,61 +56,45 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // ─── 認証系 ───────────────────────────────────────
+  // Discord用テーブルをアプリ起動時に初期化
+  try {
+    await initDiscordTables()
+  } catch (e) {
+    console.error('[discord] テーブル初期化失敗:', e)
+  }
 
+  // ─── GitHub認証系 ──────────────────────────────────
   // 保存済みトークンを取得
-  ipcMain.handle('auth:getToken', async () => {
-    return await getSavedToken()
-  })
-
+  ipcMain.handle('auth:getToken', async () => await getSavedToken())
   // デバイスフロー開始（ユーザーコードを返す）
-  ipcMain.handle('auth:login', async () => {
-  return await startOAuthFlow()
-})
-
+  ipcMain.handle('auth:login', async () => await startOAuthFlow())
   // ユーザーが認証するまでポーリング
-  ipcMain.handle('auth:poll', async () => {
-    return await pollForToken()
-  })
-
+  ipcMain.handle('auth:poll', async () => await pollForToken())
   // ログアウト
-  ipcMain.handle('auth:logout', async () => {
-    await deleteToken()
-  })
+  ipcMain.handle('auth:logout', async () => await deleteToken())
 
   // ─── リポジトリ管理系 ──────────────────────────────
-
   // GitHubからリポジトリ一覧を取得
   ipcMain.handle('repos:getAll', async () => {
     const token = await getSavedToken()
     if (!token) throw new Error('未認証です')
     return await getRepositories(token)
   })
-
   // 登録済みリポジトリを取得
-  ipcMain.handle('repos:load', () => {
-    return loadRepos()
-  })
-
+  ipcMain.handle('repos:load', () => loadRepos())
   // リポジトリを追加
-  ipcMain.handle('repos:add', (_, repo: { name: string; full_name: string }) => {
-    return addRepo(repo)
-  })
-
+  ipcMain.handle('repos:add', (_, repo: { name: string; full_name: string }) => addRepo(repo))
   // リポジトリを削除
-  ipcMain.handle('repos:remove', (_, fullName: string) => {
-    removeRepo(fullName)
-  })
+  ipcMain.handle('repos:remove', (_, fullName: string) => removeRepo(fullName))
 
   // ─── データ取得系 ──────────────────────────────────
-
   // 選択したリポジトリのデータを取得してJSONに保存
   ipcMain.handle('github:fetch', async (_, selectedRepos: string[]) => {
     const token = await getSavedToken()
@@ -98,20 +102,71 @@ app.whenReady().then(() => {
     await fetchAndSaveData(token, selectedRepos)
     return getOutputPath()
   })
-
   // リポジトリのデータから崩壊度を計算
   ipcMain.handle('github:calculateDistortion', async (_, repoName: string) => {
     const outputPath = getOutputPath()
     const data = JSON.parse(readFileSync(outputPath, 'utf-8'))
-
-    if (!data[repoName]) {
-      throw new Error(`データが見つかりません: ${repoName}`)
-    }
-
+    if (!data[repoName]) throw new Error(`データが見つかりません: ${repoName}`)
     const repoData = data[repoName]
-    const result = calculateDistortion(repoData.commits.byUser, repoData.branches.byUser)
+    return calculateDistortion(repoData.commits.byUser, repoData.branches.byUser)
+  })
 
-    return result
+  // ─── Discord OAuth認証系 ───────────────────────────
+  // 保存済みDiscordトークン確認（ユーザー情報のみ返す。トークン自体はrendererに渡さない）
+  ipcMain.handle('discord:getUser', async () => await getSavedDiscordUser())
+
+  // OAuth2フロー開始（ブラウザを開いてコールバックを待つ）
+  ipcMain.handle('discord:login', async () => await startDiscordOAuth())
+
+  // Discordログアウト
+  ipcMain.handle('discord:logout', async () => await deleteDiscordToken())
+
+  // ログインユーザーが参加しているサーバー一覧を取得
+  // → messagesテーブルのサーバーと照合して「Botが入っていてかつ自分が参加しているサーバー」だけ返す
+  ipcMain.handle('discord:getMyAvailableServers', async () => {
+    const myGuilds = await getMyGuilds()
+    const myGuildIds = new Set(myGuilds.map((g) => g.id))
+    const allServers = await getAvailableServers()
+    // Botが収集していて、かつ自分も参加しているサーバーに絞る
+    return allServers.filter((s) => myGuildIds.has(s.guild_id))
+  })
+
+  // 目的のサーバーが一覧に無い場合、Bot招待ページをブラウザで開く
+  ipcMain.handle('discord:openBotInvite', () => {
+    openBotInviteUrl()
+  })
+
+  // ─── Discord DBアクセス系 ──────────────────────────
+  // リポジトリ単位でサーバー設定を管理する（repoFullNameで絞り込む）
+  ipcMain.handle('discord:getSettings', async (_, repoFullName: string) => {
+    return await getDiscordSettings(repoFullName)
+  })
+  ipcMain.handle(
+    'discord:saveServer',
+    async (_, repoFullName: string, guildId: string, guildName: string) => {
+      await saveDiscordServer(repoFullName, guildId, guildName)
+    }
+  )
+  ipcMain.handle('discord:setBotRegistered', async (_, repoFullName: string, guildId: string) => {
+    await setBotRegistered(repoFullName, guildId)
+  })
+  ipcMain.handle('discord:getDiscordUsers', async (_, guildId: string) => {
+    return await getDiscordUsers(guildId)
+  })
+  ipcMain.handle('discord:getAccountLinks', async (_, repoFullName: string) => {
+    return await getAccountLinks(repoFullName)
+  })
+  ipcMain.handle(
+    'discord:saveAccountLink',
+    async (_, githubUsername: string, discordUserId: string, discordUserName: string, repoFullName: string) => {
+      await saveAccountLink(githubUsername, discordUserId, discordUserName, repoFullName)
+    }
+  )
+  ipcMain.handle('discord:saveGithubUsers', async (_, repoFullName: string, githubUsernames: string[]) => {
+    await saveGithubUsersToDB(repoFullName, githubUsernames)
+  })
+  ipcMain.handle('discord:calcScores', async (_, guildId: string) => {
+    return await calcDiscordScores(guildId)
   })
 
   createWindow()
