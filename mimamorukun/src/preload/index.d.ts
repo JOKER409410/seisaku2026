@@ -19,6 +19,9 @@ declare global {
       // データ取得系
       fetchData: (selectedRepos: string[]) => Promise<string>
       calculateDistortion: (repoName: string) => Promise<{ scores: Record<string, number>; avgScore: number; stdDev: number; distortion: number }>
+
+      // みまもるくん チャット系
+      chat: (message: string, userId?: string) => Promise<string>
     }
   }
 }

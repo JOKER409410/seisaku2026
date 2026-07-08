@@ -4,6 +4,7 @@ import { setupPage2, loadRepoOptions, renderRegisteredRepos } from './pages/page
 import { setupPage3, renderCheckList } from './pages/pagegit3'
 import { setupPage4 } from './pages/pagedis1'
 import { setupPage5 } from './pages/pageresult'
+import { setupChat } from './pages/pagechat'
 
 async function init(): Promise<void> {
   window.addEventListener('DOMContentLoaded', async () => {

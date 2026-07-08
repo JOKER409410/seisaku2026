@@ -42,6 +42,38 @@
         min-width: 50px;
         text-align: right;
       }
+      /* チャット追加分 */
+      #chat-container {
+        margin: 16px 0;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #ffffff;
+        color: #000000;
+      }
+      #chat {
+        height: 300px;
+        overflow-y: auto;
+        padding: 12px;
+        background: #ffffff;
+        color: #000000;
+      }
+      #chat-input-area {
+        display: flex;
+        gap: 8px;
+        padding: 8px;
+        border-top: 1px solid #ccc;
+        background: #ffffff;
+      }
+      #chat-input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        resize: none;
+        color: #000000;
+        background: #f9fafb;
+      }
     </style>
   </head>
 
@@ -107,6 +139,17 @@
         </div>
         <div id="statsContainer"></div>
         <hr />
+
+          <!-- ここから追加 -->
+      <div id="chat-container">
+        <div id="chat"></div>
+        <div id="chat-input-area">
+          <textarea id="chat-input" placeholder="みまもるくんに相談する...（Shift+Enterで改行）" rows="3"></textarea>
+          <button id="chat-send-btn">送信</button>
+        </div>
+      </div>
+          <!-- ここまで追加 -->
+
         <button id="toPage3Btn2">← 前へ</button>
       </div>
 

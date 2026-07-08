@@ -1,4 +1,5 @@
 import { showPage } from '../utils/dom'
+import { setupChat } from './pagechat'
 
 export interface DistortionData {
   scores: Record<string, number>
@@ -91,4 +92,6 @@ export function setupPage5(): void {
   backBtn?.addEventListener('click', () => {
     showPage('pagedis1')
   })
+
+  setupChat()
 }

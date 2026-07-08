@@ -46,7 +46,13 @@ const api = {
 
   // 崩壊度を計算
   calculateDistortion: (repoName: string): Promise<{ scores: Record<string, number>; avgScore: number; stdDev: number; distortion: number }> =>
-    ipcRenderer.invoke('github:calculateDistortion', repoName)
+    ipcRenderer.invoke('github:calculateDistortion', repoName),
+
+  // ─── みまもるくん チャット系 ──────────────────────────
+
+  // メッセージを送信して返答を取得
+  chat: (message: string, userId: string = 'default'): Promise<string> =>
+    ipcRenderer.invoke('chat:send', message, userId)
 }
 
 if (process.contextIsolated) {
