@@ -23,7 +23,12 @@ declare global {
         avgScore: number
         stdDev: number
         distortion: number
+
       }>
+
+      // みまもるくん チャット系
+      chat: (message: string, userId?: string) => Promise<string>
+
 
       // Discord系
       discord: {
